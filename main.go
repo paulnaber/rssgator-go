@@ -1,14 +1,42 @@
 package main
 
-import "github.com/paulnaber/rssgator-go/internal/config"
-import "fmt"
+import (
+	"log"
+	"os"
+
+	"github.com/paulnaber/rssgator-go/internal/config"
+)
+
+type state struct {
+	cfg *config.Config
+}
 
 func main() {
-
-	config, err := config.ReadConfig()
+	cfg, err := config.Read()
 	if err != nil {
-		fmt.Println("Error reading config:", err)
+		log.Fatalf("error reading config: %v", err)
 	}
-	fmt.Printf("Config: %v", config)
 
+	programState := &state{
+		cfg: &cfg,
+	}
+
+	cmds := commands{
+		registeredCommands: make(map[string]func(*state, command) error),
+	}
+	cmds.register("login", handlerLogin)
+
+	if len(os.Args) < 2 {
+		log.Fatal("Usage: cli <command> [args...]")
+		return
+	}
+
+	// starting at 1 because the first arg is the program name
+	cmdName := os.Args[1]
+	cmdArgs := os.Args[2:]
+
+	err = cmds.run(programState, command{Name: cmdName, Args: cmdArgs})
+	if err != nil {
+		log.Fatal(err)
+	}
 }

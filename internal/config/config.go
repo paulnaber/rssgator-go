@@ -2,43 +2,70 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
+	"path/filepath"
 )
 
+const configFileName = ".gatorconfig.json"
+
 type Config struct {
-	DbUrl           string `json:"db_url"`
+	DBURL           string `json:"db_url"`
 	CurrentUserName string `json:"current_user_name"`
 }
 
-// Read from ~/.gatorconfig.json
-// return Config struct from json
-func ReadConfig() (Config, error) {
-	path, err := getUserHomePath()
-	if err != nil {
-		fmt.Println("Error getting user home path:", err)
-		return Config{}, err
-	}
-	path = path + "/.gatorconfig.json"
-
-	jsonData, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Println("Error reading config file:", err)
-		return Config{}, err
-	}
-	parsedData := Config{}
-	err = json.Unmarshal(jsonData, &parsedData)
-	if err != nil {
-		fmt.Println("Error parsing config file", err)
-		return Config{}, err
-	}
-	return parsedData, nil
+func (cfg *Config) SetUser(userName string) error {
+	cfg.CurrentUserName = userName
+	return write(*cfg)
 }
 
-func getUserHomePath() (string, error) {
-	usr, err := os.UserHomeDir()
+func Read() (Config, error) {
+	fullPath, err := getConfigFilePath()
+	if err != nil {
+		return Config{}, err
+	}
+
+	file, err := os.Open(fullPath)
+	if err != nil {
+		return Config{}, err
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	cfg := Config{}
+	err = decoder.Decode(&cfg)
+	if err != nil {
+		return Config{}, err
+	}
+
+	return cfg, nil
+}
+
+func getConfigFilePath() (string, error) {
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return usr, nil
+	fullPath := filepath.Join(home, configFileName)
+	return fullPath, nil
+}
+
+func write(cfg Config) error {
+	fullPath, err := getConfigFilePath()
+	if err != nil {
+		return err
+	}
+
+	file, err := os.Create(fullPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	err = encoder.Encode(cfg)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
